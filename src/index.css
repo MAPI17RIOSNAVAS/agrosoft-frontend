@@ -1,0 +1,8 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@100..900&display=swap');
+@import "tailwindcss";
+
+@theme {
+    --font-outfit: 'Outfit', sans-serif;
+}
+@theme {
+    --tracking-1: -0.02em;}
