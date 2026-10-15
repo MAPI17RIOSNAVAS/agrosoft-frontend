@@ -2,9 +2,10 @@ import { useState } from 'react';
 import { Mail, Lock, Eye, EyeOff, ChevronRight } from 'lucide-react';
 import { loginRequest } from '../services/authService';
 
-export default function LoginF({ onLoginSuccess, onIrRegistro }) {
+// correoInicial: correo de la cuenta recién creada, para que solo falte la contraseña
+export default function LoginF({ onLoginSuccess, onIrRegistro, correoInicial = '' }) {
   const [formData, setFormData] = useState({
-    correo: '',
+    correo: correoInicial,
     password: '',
     recordarme: false,
   });
@@ -46,14 +47,19 @@ export default function LoginF({ onLoginSuccess, onIrRegistro }) {
         // 1. Extraemos el correo del token o del formulario
         const correoUsuario = payload.email || formData.correo || 'Usuario';
         
-        // 2. Generamos un nombre legible basado en el correo (ej: "carlos.perez@..." -> "Carlos")
-        const nombreExtraido = payload.nombre || payload.name || data.nombre || 
+        // 2. El backend devuelve los datos del usuario (incluida la foto) junto al token
+        const datosUsuario = data.usuario || {};
+
+        // 3. Si no viene el nombre, generamos uno legible basado en el correo (ej: "carlos.perez@..." -> "Carlos")
+        const nombreExtraido = datosUsuario.nombre || payload.nombre || payload.name ||
           correoUsuario.split('@')[0].replace(/[._]/g, ' ');
 
         const usuarioAEnviar = {
+          ...datosUsuario,
           token: tokenRecibido,
           nombre: nombreExtraido.charAt(0).toUpperCase() + nombreExtraido.slice(1),
-          rol: payload.rol || payload.role || data.rol || 'rol', 
+          rol: datosUsuario.rolLabel || datosUsuario.rol || payload.rol || 'Rol',
+          fotoPerfil: datosUsuario.fotoPerfil || null,
         };
 
         if (onLoginSuccess) onLoginSuccess(usuarioAEnviar);
@@ -75,13 +81,19 @@ export default function LoginF({ onLoginSuccess, onIrRegistro }) {
         <p className="text-sm text-slate-500 mt-1.5">Accede a tu cuenta de AGROSOFT</p>
       </div>
 
+      {correoInicial && !error && (
+        <div className="p-3 mb-6 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-xl text-sm font-medium">
+          Cuenta creada correctamente. Ingresa tu contraseña para iniciar sesión.
+        </div>
+      )}
+
       {error && (
         <div className="p-3 mb-6 bg-red-50 border border-red-200 text-red-700 rounded-xl text-sm font-medium">
           {error}
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="space-y-5">
+      <form onSubmit={handleSubmit} autoComplete="off" className="space-y-5">
         {/* Correo Electrónico */}
         <div>
           <label className="block text-xs font-semibold text-slate-700 mb-1.5">
@@ -92,6 +104,7 @@ export default function LoginF({ onLoginSuccess, onIrRegistro }) {
             <input
               type="email"
               name="correo"
+              autoComplete="off"
               required
               value={formData.correo}
               onChange={handleChange}
@@ -109,6 +122,8 @@ export default function LoginF({ onLoginSuccess, onIrRegistro }) {
             <input
               type={mostrarPassword ? 'text' : 'password'}
               name="password"
+              autoFocus={Boolean(correoInicial)}
+              autoComplete="new-password"
               required
               value={formData.password}
               onChange={handleChange}

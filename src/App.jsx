@@ -7,6 +7,7 @@ import Dashboard from './components/Dashboard';
 export default function App() {
   const [vista, setVista] = useState('login'); // 'login' | 'registro' | 'dashboard'
   const [usuario, setUsuario] = useState(null);
+  const [correoRegistrado, setCorreoRegistrado] = useState('');
 
   // Mantener sesión si ya existe un token guardado
   useEffect(() => {
@@ -22,8 +23,18 @@ export default function App() {
   const handleLoginSuccess = (data) => {
     setUsuario(data.usuario || data);
     localStorage.setItem('usuario', JSON.stringify(data.usuario || data));
+    setCorreoRegistrado('');
     // Redirige directamente al Dashboard
     setVista('dashboard');
+  };
+
+  // Refleja en la sesión los cambios hechos desde "Mi Perfil"
+  const handleUsuarioActualizado = (cambios) => {
+    setUsuario((prev) => {
+      const actualizado = { ...prev, ...cambios };
+      localStorage.setItem('usuario', JSON.stringify(actualizado));
+      return actualizado;
+    });
   };
 
   // Función para cerrar sesión
@@ -36,7 +47,7 @@ export default function App() {
 
   // 1. VISTA DASHBOARD (cuando la sesión está iniciada)
   if (vista === 'dashboard') {
-    return <Dashboard usuario={usuario} onLogout={handleLogout} />;
+    return <Dashboard usuario={usuario} onLogout={handleLogout} onUsuarioActualizado={handleUsuarioActualizado} />;
   }
 
   // 2. VISTAS DE AUTENTICACIÓN (Login y Registro)
@@ -56,11 +67,18 @@ export default function App() {
           {vista === 'login' ? (
             <LoginF
               onLoginSuccess={handleLoginSuccess}
-              onIrRegistro={() => setVista('registro')}
+              onIrRegistro={() => {
+                setCorreoRegistrado('');
+                setVista('registro');
+              }}
+              correoInicial={correoRegistrado}
             />
           ) : (
             <CrearUsuarioForm
-              onUsuarioCreado={() => setVista('login')}
+              onUsuarioCreado={(correo) => {
+                setCorreoRegistrado(correo);
+                setVista('login');
+              }}
               onVolverLogin={() => setVista('login')}
             />
           )}

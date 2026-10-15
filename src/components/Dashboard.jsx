@@ -31,7 +31,7 @@ import Inventario from '../pages/Inventario.jsx';
 import Perfil from '../pages/Perfil.jsx';
 import Configuracion from '../pages/Configuracion.jsx';
 
-export default function Dashboard({ usuario, onLogout }) {
+export default function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
   const [menuActivo, setMenuActivo] = useState('Dashboard');
   const [sidebarAbierto, setSidebarAbierto] = useState(false);
 
@@ -63,7 +63,7 @@ export default function Dashboard({ usuario, onLogout }) {
       case 'Calendario': return <Calendario />;
       case 'Sensores': return <Sensores />;
       case 'Inventario': return <Inventario />;
-      case 'Perfil': return <Perfil />;
+      case 'Perfil': return <Perfil usuario={usuario} onUsuarioActualizado={onUsuarioActualizado} />;
       case 'Configuracion': return <Configuracion />;
       default: return dashboardHome();
     }
@@ -76,7 +76,13 @@ export default function Dashboard({ usuario, onLogout }) {
     </div>
   );
 
-  const nombreUsuario = usuario?.nombre || 'Usuario';
+  const nombreUsuario = [usuario?.nombre, usuario?.apellido].filter(Boolean).join(' ') || 'Usuario';
+  // Iniciales: primera letra del nombre y del apellido (ej: "María Paula Navas" -> "MN")
+  const inicialesUsuario = (
+    usuario?.apellido
+      ? `${usuario.nombre?.[0] ?? ''}${usuario.apellido[0]}`
+      : nombreUsuario.substring(0, 2)
+  ).toUpperCase();
   const rolUsuario = usuario?.rol || 'Rol';
 
   // Cambiar pestaña y cerrar sidebar en móvil
@@ -199,9 +205,17 @@ export default function Dashboard({ usuario, onLogout }) {
 
             {/* Perfil del Usuario */}
             <div className="flex items-center gap-2 border-l border-slate-200 pl-3 md:pl-4 cursor-pointer">
-              <div className="w-8 h-8 rounded-full bg-emerald-700 text-white font-bold flex items-center justify-center text-xs shrink-0">
-                {nombreUsuario.substring(0, 2).toUpperCase()}
-              </div>
+              {usuario?.fotoPerfil ? (
+                <img
+                  src={usuario.fotoPerfil}
+                  alt={`Foto de ${nombreUsuario}`}
+                  className="w-8 h-8 rounded-full object-cover shrink-0"
+                />
+              ) : (
+                <div className="w-8 h-8 rounded-full bg-emerald-700 text-white font-bold flex items-center justify-center text-xs shrink-0">
+                  {inicialesUsuario}
+                </div>
+              )}
               <div className="text-left leading-tight hidden sm:block">
                 <p className="text-xs font-bold text-slate-800">{nombreUsuario}</p>
                 <p className="text-[10px] text-slate-400">{rolUsuario}</p>

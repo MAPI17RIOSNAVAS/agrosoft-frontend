@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   User,
   ShieldCheck,
@@ -10,28 +10,61 @@ import {
   Eye,
   EyeOff,
   ArrowLeft,
-  ImagePlus,
-  CheckCircle2,
+  ChevronDown,
 } from 'lucide-react';
-import { crearUsuarioRequest } from '../api/usuarios.api';
+import {
+  crearUsuarioRequest,
+  obtenerProgramasFormacionOpcionesRequest,
+  obtenerRolesOpcionesRequest,
+} from '../api/usuarios.api';
+import FotoPerfilInput from './FotoPerfilInput';
+
+const FORM_INICIAL = {
+  nombre: '',
+  apellido: '',
+  identificacion: '',
+  correo: '',
+  password: '',
+  confirmPassword: '',
+  idFicha: '',
+  telefono: '',
+  programaFormacion: '',
+  rol: 'APRENDIZ',
+  fotoPerfil: '',
+};
+
+const selectClassName =
+  'w-full pl-10 pr-9 py-2.5 bg-white border border-slate-200 rounded-xl text-sm appearance-none focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition disabled:bg-slate-50 disabled:text-slate-400';
 
 export default function CrearUsuarioForm({ onUsuarioCreado, onVolverLogin }) {
-  const [formData, setFormData] = useState({
-    nombre: '',
-    apellido: '',
-    identificacion: '',
-    correo: '',
-    password: '',
-    confirmPassword: '',
-    idFicha: '',
-    telefono: '',
-    programaFormacionId: '',
-    rol: 'Administrador',
-  });
+  const [formData, setFormData] = useState(FORM_INICIAL);
 
   const [mostrarPassword, setMostrarPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  // texto puede ser un string o un array de mensajes del backend
   const [mensaje, setMensaje] = useState({ tipo: '', texto: '' });
+
+  const [roles, setRoles] = useState([]);
+  const [programas, setProgramas] = useState([]);
+  const [cargandoOpciones, setCargandoOpciones] = useState(true);
+
+  useEffect(() => {
+    Promise.all([obtenerRolesOpcionesRequest(), obtenerProgramasFormacionOpcionesRequest()])
+      .then(([rolesOpciones, programasOpciones]) => {
+        setRoles(rolesOpciones);
+        setProgramas(programasOpciones);
+      })
+      .catch(() => {
+        setMensaje({
+          tipo: 'error',
+          texto: 'No se pudieron cargar los roles y programas de formación. Recarga la página.',
+        });
+      })
+      .finally(() => setCargandoOpciones(false));
+  }, []);
+
+  // Sin rol elegido, el backend asume APRENDIZ
+  const esAprendiz = !formData.rol || formData.rol === 'APRENDIZ';
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -42,56 +75,52 @@ export default function CrearUsuarioForm({ onUsuarioCreado, onVolverLogin }) {
     e.preventDefault();
     setMensaje({ tipo: '', texto: '' });
 
+    const errores = [];
     if (formData.password !== formData.confirmPassword) {
-      setMensaje({
-        tipo: 'error',
-        texto: 'Las contraseñas no coinciden. Por favor, verifícalas.',
-      });
+      errores.push('Las contraseñas no coinciden. Por favor, verifícalas.');
+    }
+    if (esAprendiz && !formData.programaFormacion) {
+      errores.push('El programa de formación es obligatorio para aprendices.');
+    }
+    if (esAprendiz && formData.idFicha === '') {
+      errores.push('El ID de ficha es obligatorio para aprendices.');
+    }
+    if (formData.idFicha !== '' && !Number.isInteger(Number(formData.idFicha))) {
+      errores.push('El ID de ficha debe ser un número entero.');
+    }
+    if (errores.length) {
+      setMensaje({ tipo: 'error', texto: errores });
       return;
     }
 
     setLoading(true);
 
     try {
-      const { confirmPassword, ...datosAEnviar } = formData;
-      const payload = {
-        ...datosAEnviar,
-        idFicha: Number(datosAEnviar.idFicha),
-        telefono: datosAEnviar.telefono || null,
-        programaFormacionId: datosAEnviar.programaFormacionId || null,
-      };
-
-      await crearUsuarioRequest(payload);
+      await crearUsuarioRequest({
+        nombre: formData.nombre,
+        apellido: formData.apellido,
+        identificacion: formData.identificacion,
+        correo: formData.correo,
+        password: formData.password,
+        telefono: formData.telefono || undefined,
+        rol: formData.rol || undefined,
+        programaFormacion: formData.programaFormacion || undefined,
+        idFicha: formData.idFicha === '' ? undefined : Number(formData.idFicha),
+        fotoPerfil: formData.fotoPerfil || undefined,
+      });
       setMensaje({ tipo: 'exito', texto: 'Usuario creado correctamente' });
 
-      setFormData({
-        nombre: '',
-        apellido: '',
-        identificacion: '',
-        correo: '',
-        password: '',
-        confirmPassword: '',
-        idFicha: '',
-        telefono: '',
-        programaFormacionId: '',
-        rol: 'Administrador',
-      });
+      setFormData(FORM_INICIAL);
 
-      if (onUsuarioCreado) onUsuarioCreado();
+      // Se pasa el correo para que el login lo muestre ya escrito
+      if (onUsuarioCreado) onUsuarioCreado(formData.correo);
     } catch (error) {
       const errorMsg = error.response?.data?.message || 'Error al crear el usuario';
-      setMensaje({ tipo: 'error', texto: Array.isArray(errorMsg) ? errorMsg.join(', ') : errorMsg });
+      setMensaje({ tipo: 'error', texto: errorMsg });
     } finally {
       setLoading(false);
     }
   };
-
-  const roles = [
-    { id: 'Administrador', titulo: 'Administrador' },
-    { id: 'Instructor', titulo: 'Instructor' },
-    { id: 'Cliente', titulo: 'Cliente' },
-    { id: 'Aprendiz', titulo: 'Aprendiz' },
-  ];
 
   return (
     // Ancho expandido a max-w-3xl para tomar mayor presencia
@@ -110,18 +139,11 @@ export default function CrearUsuarioForm({ onUsuarioCreado, onVolverLogin }) {
           <p className="text-slate-500 text-sm mt-1">Completa el formulario para solicitar acceso</p>
         </div>
 
-        {/* Foto de perfil compacta al costado derecho en pantallas medianas */}
-        <div className="flex items-center gap-3">
-          <div className="w-14 h-14 rounded-full border-2 border-dashed border-emerald-400 flex flex-col items-center justify-center cursor-pointer hover:bg-emerald-50/50 transition shrink-0">
-            <ImagePlus className="w-4 h-4 text-emerald-600" />
-            <span className="text-[9px] text-slate-500 font-medium text-center leading-none mt-0.5">
-              Foto
-            </span>
-          </div>
-          <span className="text-xs text-slate-400 max-w-[120px] leading-tight">
-            Sube una foto de perfil opcional
-          </span>
-        </div>
+        {/* Foto de perfil: se puede tomar con la cámara o subir desde un archivo */}
+        <FotoPerfilInput
+          value={formData.fotoPerfil}
+          onChange={(fotoPerfil) => setFormData((prev) => ({ ...prev, fotoPerfil }))}
+        />
       </div>
 
       {mensaje.texto && (
@@ -132,11 +154,19 @@ export default function CrearUsuarioForm({ onUsuarioCreado, onVolverLogin }) {
               : 'bg-red-50 text-red-700 border border-red-200'
           }`}
         >
-          {mensaje.texto}
+          {Array.isArray(mensaje.texto) ? (
+            <ul className="list-disc pl-5 space-y-0.5">
+              {mensaje.texto.map((texto) => (
+                <li key={texto}>{texto}</li>
+              ))}
+            </ul>
+          ) : (
+            mensaje.texto
+          )}
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form onSubmit={handleSubmit} autoComplete="off" className="space-y-4">
         {/* Nombre y Apellido */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
@@ -212,6 +242,7 @@ export default function CrearUsuarioForm({ onUsuarioCreado, onVolverLogin }) {
             <input
               type="email"
               name="correo"
+              autoComplete="off"
               required
               value={formData.correo}
               onChange={handleChange}
@@ -221,58 +252,66 @@ export default function CrearUsuarioForm({ onUsuarioCreado, onVolverLogin }) {
           </div>
         </div>
 
-        {/* Rol solicitado: distribuido en 4 columnas en pantallas medianas */}
+        {/* Rol solicitado */}
         <div>
           <label className="block text-xs font-semibold text-slate-700 mb-1.5">Rol solicitado</label>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5">
-            {roles.map((item) => {
-              const checked = formData.rol === item.id;
-              return (
-                <label
-                  key={item.id}
-                  className={`flex items-center justify-center gap-2 p-3 border rounded-xl cursor-pointer transition select-none ${
-                    checked ? 'border-emerald-600 bg-emerald-50/50 shadow-sm' : 'border-slate-200 hover:border-slate-300'
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    name="rol"
-                    value={item.id}
-                    checked={checked}
-                    onChange={handleChange}
-                    className="accent-emerald-600 cursor-pointer"
-                  />
-                  <span className="text-xs font-medium text-slate-800">{item.titulo}</span>
-                </label>
-              );
-            })}
+          <div className="relative">
+            <ShieldCheck className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <select
+              name="rol"
+              value={formData.rol}
+              onChange={handleChange}
+              disabled={cargandoOpciones}
+              className={selectClassName}
+            >
+              {cargandoOpciones && <option value={formData.rol}>Cargando roles...</option>}
+              {roles.map((opcion) => (
+                <option key={opcion.value} value={opcion.value}>
+                  {opcion.label}
+                </option>
+              ))}
+            </select>
+            <ChevronDown className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
           </div>
         </div>
 
-        {/* Programa de formación e ID de ficha */}
+        {/* Programa de formación e ID de ficha: obligatorios solo para aprendices */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1.5">Programa de formación</label>
+            <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+              Programa de formación{!esAprendiz && <span className="font-normal text-slate-400"> (opcional)</span>}
+            </label>
             <div className="relative">
               <BookOpen className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-              <input
-                type="text"
-                name="programaFormacionId"
-                value={formData.programaFormacionId}
+              <select
+                name="programaFormacion"
+                required={esAprendiz}
+                value={formData.programaFormacion}
                 onChange={handleChange}
-                placeholder="Ej: Gestión Agropecuaria"
-                className="w-full pl-10 pr-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition"
-              />
+                disabled={cargandoOpciones}
+                className={selectClassName}
+              >
+                <option value="">{cargandoOpciones ? 'Cargando programas...' : 'Selecciona un programa'}</option>
+                {programas.map((opcion) => (
+                  <option key={opcion.value} value={opcion.value}>
+                    {opcion.label}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
             </div>
           </div>
           <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1.5">ID de ficha</label>
+            <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+              ID de ficha{!esAprendiz && <span className="font-normal text-slate-400"> (opcional)</span>}
+            </label>
             <div className="relative">
               <Hash className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
               <input
                 type="number"
                 name="idFicha"
-                required
+                step="1"
+                required={esAprendiz}
                 value={formData.idFicha}
                 onChange={handleChange}
                 placeholder="Número de ficha SENA"
@@ -291,6 +330,7 @@ export default function CrearUsuarioForm({ onUsuarioCreado, onVolverLogin }) {
               <input
                 type={mostrarPassword ? 'text' : 'password'}
                 name="password"
+                autoComplete="new-password"
                 required
                 value={formData.password}
                 onChange={handleChange}
@@ -313,6 +353,7 @@ export default function CrearUsuarioForm({ onUsuarioCreado, onVolverLogin }) {
               <input
                 type="password"
                 name="confirmPassword"
+                autoComplete="new-password"
                 required
                 value={formData.confirmPassword}
                 onChange={handleChange}
@@ -321,11 +362,6 @@ export default function CrearUsuarioForm({ onUsuarioCreado, onVolverLogin }) {
               />
             </div>
           </div>
-        </div>
-
-        <div className="flex items-center gap-2.5 p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-800 text-xs mt-2">
-          <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600" />
-          <span>Tu solicitud será revisada por un administrador antes de activar el acceso.</span>
         </div>
 
         <button
