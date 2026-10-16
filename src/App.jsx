@@ -3,21 +3,31 @@ import LoginT from './components/LoginT';
 import LoginF from './components/LoginF';
 import CrearUsuarioForm from './components/Register';
 import Dashboard from './components/Dashboard';
+import RecuperarPassword from './components/RecuperarPassword';
+import RestablecerPassword from './components/RestablecerPassword';
 
 export default function App() {
-  const [vista, setVista] = useState('login'); // 'login' | 'registro' | 'dashboard'
+  // Enlace del correo de recuperación: /restablecer-password?token=...
+  const [tokenRestablecer] = useState(() =>
+    window.location.pathname === '/restablecer-password'
+      ? new URLSearchParams(window.location.search).get('token')
+      : null
+  );
+  // 'login' | 'registro' | 'recuperar' | 'restablecer' | 'dashboard'
+  const [vista, setVista] = useState(tokenRestablecer ? 'restablecer' : 'login');
   const [usuario, setUsuario] = useState(null);
   const [correoRegistrado, setCorreoRegistrado] = useState('');
+  const [correoRecuperar, setCorreoRecuperar] = useState('');
 
   // Mantener sesión si ya existe un token guardado
   useEffect(() => {
     const token = localStorage.getItem('token');
     const usuarioGuardado = localStorage.getItem('usuario');
-    if (token) {
+    if (token && !tokenRestablecer) {
       if (usuarioGuardado) setUsuario(JSON.parse(usuarioGuardado));
       setVista('dashboard');
     }
-  }, []);
+  }, [tokenRestablecer]);
 
   // Función ejecutada cuando el Login tiene éxito
   const handleLoginSuccess = (data) => {
@@ -61,12 +71,29 @@ export default function App() {
       <main className="flex-1 h-full overflow-y-auto flex items-center justify-center p-6 lg:p-12">
         <div
           className={`w-full bg-white p-8 lg:p-10 rounded-2xl shadow-sm border border-slate-100 my-auto transition-all duration-300 ${
-            vista === 'login' ? 'max-w-md' : 'max-w-5xl'
+            vista === 'registro' ? 'max-w-5xl' : 'max-w-md'
           }`}
         >
-          {vista === 'login' ? (
+          {vista === 'restablecer' ? (
+            <RestablecerPassword
+              token={tokenRestablecer}
+              onTerminar={() => {
+                window.history.replaceState(null, '', '/');
+                setVista('login');
+              }}
+            />
+          ) : vista === 'recuperar' ? (
+            <RecuperarPassword
+              correoInicial={correoRecuperar}
+              onVolver={() => setVista('login')}
+            />
+          ) : vista === 'login' ? (
             <LoginF
               onLoginSuccess={handleLoginSuccess}
+              onIrRecuperar={(correo) => {
+                setCorreoRecuperar(correo);
+                setVista('recuperar');
+              }}
               onIrRegistro={() => {
                 setCorreoRegistrado('');
                 setVista('registro');

@@ -110,6 +110,14 @@ export default function Tratamientos() {
   const conteoVencidos = tratamientos.filter(t => t.estado === 'Vencido').length;
   const conteoFinalizados = tratamientos.filter(t => t.estado === 'Finalizado').length;
 
+  // Tarjetas de resumen: al hacer clic filtran la lista por ese estado
+  const TARJETAS_ESTADO = [
+    { estado: 'Activo', conteo: conteoActivos, numero: 'text-[#15803d]', activa: 'bg-emerald-50 border-emerald-300' },
+    { estado: 'Próximo a vencer', conteo: conteoProximos, numero: 'text-[#b45309]', activa: 'bg-[#fffbeb] border-[#fcd34d]' },
+    { estado: 'Vencido', conteo: conteoVencidos, numero: 'text-[#b91c1c]', activa: 'bg-red-50 border-red-300' },
+    { estado: 'Finalizado', conteo: conteoFinalizados, numero: 'text-slate-600', activa: 'bg-slate-100 border-slate-300' },
+  ];
+
   // Abrir modal en modo crear
   const abrirModalCrear = () => {
     setEsEdicion(false);
@@ -238,22 +246,24 @@ export default function Tratamientos() {
 
       {/* 2. TARJETAS DE CONTEO */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white border border-slate-200/90 rounded-2xl p-5 shadow-sm">
-          <p className="text-3xl font-black text-[#15803d]">{conteoActivos}</p>
-          <p className="text-xs font-semibold text-slate-500 mt-1">Activo</p>
-        </div>
-        <div className="bg-white border border-slate-200/90 rounded-2xl p-5 shadow-sm">
-          <p className="text-3xl font-black text-[#b45309]">{conteoProximos}</p>
-          <p className="text-xs font-semibold text-slate-500 mt-1">Próximo a vencer</p>
-        </div>
-        <div className="bg-white border border-slate-200/90 rounded-2xl p-5 shadow-sm">
-          <p className="text-3xl font-black text-[#b91c1c]">{conteoVencidos}</p>
-          <p className="text-xs font-semibold text-slate-500 mt-1">Vencido</p>
-        </div>
-        <div className="bg-white border border-slate-200/90 rounded-2xl p-5 shadow-sm">
-          <p className="text-3xl font-black text-slate-600">{conteoFinalizados}</p>
-          <p className="text-xs font-semibold text-slate-500 mt-1">Finalizado</p>
-        </div>
+        {TARJETAS_ESTADO.map(({ estado, conteo, numero, activa }) => {
+          const seleccionada = filtroEstado === estado;
+          return (
+            <button
+              key={estado}
+              type="button"
+              onClick={() => setFiltroEstado(seleccionada ? 'Todos' : estado)}
+              aria-pressed={seleccionada}
+              title={seleccionada ? 'Quitar filtro' : `Ver tratamientos: ${estado}`}
+              className={`text-left border rounded-2xl p-5 shadow-sm transition cursor-pointer hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40 ${
+                seleccionada ? activa : 'bg-white border-slate-200/90 hover:border-slate-300'
+              }`}
+            >
+              <p className={`text-3xl font-black ${numero}`}>{conteo}</p>
+              <p className="text-xs font-semibold text-slate-500 mt-1">{estado}</p>
+            </button>
+          );
+        })}
       </div>
 
       {/* 3. BARRA DE HERRAMIENTAS */}
@@ -295,6 +305,11 @@ export default function Tratamientos() {
 
       {/* 4. GRILLA DE TRATAMIENTOS */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        {tratamientosFiltrados.length === 0 && (
+          <p className="lg:col-span-2 text-center text-sm text-slate-400 py-10">
+            No hay tratamientos que coincidan con el filtro.
+          </p>
+        )}
         {tratamientosFiltrados.map((item) => {
           const config = getBadgeYBorder(item.estado);
 

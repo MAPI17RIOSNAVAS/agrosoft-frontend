@@ -3,7 +3,7 @@ import { Mail, Lock, Eye, EyeOff, ChevronRight } from 'lucide-react';
 import { loginRequest } from '../services/authService';
 
 // correoInicial: correo de la cuenta recién creada, para que solo falte la contraseña
-export default function LoginF({ onLoginSuccess, onIrRegistro, correoInicial = '' }) {
+export default function LoginF({ onLoginSuccess, onIrRegistro, onIrRecuperar, correoInicial = '' }) {
   const [formData, setFormData] = useState({
     correo: correoInicial,
     password: '',
@@ -154,6 +154,7 @@ export default function LoginF({ onLoginSuccess, onIrRegistro, correoInicial = '
           </label>
           <button
             type="button"
+            onClick={() => onIrRecuperar?.(formData.correo)}
             className="text-emerald-700 font-semibold hover:underline"
           >
             ¿Olvidaste tu contraseña?

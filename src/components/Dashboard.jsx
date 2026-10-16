@@ -1,14 +1,16 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   LayoutDashboard,
-  Sprout,
+  Map,
   ClipboardList,
-  AlertTriangle,
-  FlaskConical,
-  Wheat,
-  CalendarDays,
+  ShieldAlert,
   Radio,
-  Package,
+  Box,
+  ShoppingCart,
+  Users,
+  BookOpen,
+  ChartColumn,
+  ChevronRight,
   User,
   Settings,
   LogOut,
@@ -34,24 +36,69 @@ import Configuracion from '../pages/Configuracion.jsx';
 export default function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
   const [menuActivo, setMenuActivo] = useState('Dashboard');
   const [sidebarAbierto, setSidebarAbierto] = useState(false);
+  const [menuUsuarioAbierto, setMenuUsuarioAbierto] = useState(false);
+  const menuUsuarioRef = useRef(null);
+  const [grupoAbierto, setGrupoAbierto] = useState(null);
+  const [confirmarSalida, setConfirmarSalida] = useState(false);
 
-  // Menú lateral principal
+  // Menú lateral principal: los ítems con "hijos" son grupos desplegables
   const menuItems = [
     { id: 'Dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'Unidades', label: 'Unidades Productivas', icon: Sprout },
-    { id: 'Actividades', label: 'Actividades', icon: ClipboardList },
-    { id: 'Incidencias', label: 'Incidencias', icon: AlertTriangle },
-    { id: 'Tratamientos', label: 'Tratamientos', icon: FlaskConical },
-    { id: 'Cosechas', label: 'Cosechas', icon: Wheat },
-    { id: 'Calendario', label: 'Calendario / Tareas', icon: CalendarDays },
-    { id: 'Sensores', label: 'Sensores IoT', icon: Radio },
-    { id: 'Inventario', label: 'Inventario', icon: Package },
-    { id: 'Perfil', label: 'Mi Perfil', icon: User },
-    { id: 'Configuracion', label: 'Configuración', icon: Settings },
+    {
+      id: 'g-territorio', label: 'Territorio y Cultivos', icon: Map,
+      hijos: [
+        { id: 'Unidades', label: 'Unidades Productivas' },
+        { id: 'Cosechas', label: 'Cosechas' },
+      ],
+    },
+    {
+      id: 'g-actividades', label: 'Actividades de Campo', icon: ClipboardList,
+      hijos: [
+        { id: 'Actividades', label: 'Actividades' },
+        { id: 'Calendario', label: 'Calendario / Tareas' },
+      ],
+    },
+    {
+      id: 'g-fitosanitario', label: 'Control Fitosanitario', icon: ShieldAlert,
+      hijos: [
+        { id: 'Incidencias', label: 'Incidencias' },
+        { id: 'Tratamientos', label: 'Tratamientos' },
+      ],
+    },
+    {
+      id: 'g-sensores', label: 'Sensores IoT', icon: Radio,
+      hijos: [
+        { id: 'Sensores', label: 'Monitoreo en Tiempo Real' },
+        { id: 'Alertas', label: 'Alertas' },
+      ],
+    },
+    {
+      id: 'g-inventario', label: 'Inventario e Insumos', icon: Box,
+      hijos: [{ id: 'Inventario', label: 'Inventario' }],
+    },
+    {
+      id: 'g-comercial', label: 'Comercial y Ventas', icon: ShoppingCart,
+      hijos: [{ id: 'Ventas', label: 'Ventas' }],
+    },
+    {
+      id: 'g-usuarios', label: 'Usuarios y Seguridad', icon: Users,
+      hijos: [{ id: 'Usuarios', label: 'Usuarios' }],
+    },
+    { id: 'Wiki', label: 'Wiki Agronómica', icon: BookOpen },
+    { id: 'Reportes', label: 'Reportes', icon: ChartColumn },
   ];
 
-  const itemActivo = menuItems.find((item) => item.id === menuActivo);
-  const tituloActivo = itemActivo ? itemActivo.label : 'Dashboard';
+  // Accesos fijos al pie del sidebar
+  const menuPie = [
+    { id: 'Configuracion', label: 'Configuración', icon: Settings },
+    { id: 'Perfil', label: 'Mi Perfil', icon: User },
+  ];
+
+  const hojas = [...menuItems.flatMap((item) => item.hijos || [item]), ...menuPie];
+  const tituloActivo = hojas.find((item) => item.id === menuActivo)?.label || 'Dashboard';
+
+  // Acordeón: solo un grupo abierto a la vez
+  const alternarGrupo = (id) => setGrupoAbierto((actual) => (actual === id ? null : id));
 
   const renderComponente = () => {
     switch (menuActivo) {
@@ -65,9 +112,21 @@ export default function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
       case 'Inventario': return <Inventario />;
       case 'Perfil': return <Perfil usuario={usuario} onUsuarioActualizado={onUsuarioActualizado} />;
       case 'Configuracion': return <Configuracion />;
+      case 'Alertas':
+      case 'Ventas':
+      case 'Usuarios':
+      case 'Wiki':
+      case 'Reportes': return proximamente();
       default: return dashboardHome();
     }
   };
+
+  const proximamente = () => (
+    <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm">
+      <h3 className="text-lg font-bold text-slate-900">{tituloActivo}</h3>
+      <p className="text-sm text-slate-500 mt-1">Este módulo estará disponible próximamente.</p>
+    </div>
+  );
 
   const dashboardHome = () => (
     <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm">
@@ -85,9 +144,33 @@ export default function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
   ).toUpperCase();
   const rolUsuario = usuario?.rol || 'Rol';
 
+  // Cierra el menú del usuario al hacer clic fuera o presionar Escape
+  useEffect(() => {
+    if (!menuUsuarioAbierto) return;
+    const alClickFuera = (e) => {
+      if (menuUsuarioRef.current && !menuUsuarioRef.current.contains(e.target)) {
+        setMenuUsuarioAbierto(false);
+      }
+    };
+    const alTeclear = (e) => e.key === 'Escape' && setMenuUsuarioAbierto(false);
+    document.addEventListener('mousedown', alClickFuera);
+    document.addEventListener('keydown', alTeclear);
+    return () => {
+      document.removeEventListener('mousedown', alClickFuera);
+      document.removeEventListener('keydown', alTeclear);
+    };
+  }, [menuUsuarioAbierto]);
+
+  const irDesdeMenuUsuario = (id) => {
+    setMenuUsuarioAbierto(false);
+    setMenuActivo(id);
+  };
+
   // Cambiar pestaña y cerrar sidebar en móvil
   const seleccionarOpcion = (id) => {
     setMenuActivo(id);
+    // Abre el grupo de la opción elegida y cierra los demás
+    setGrupoAbierto(menuItems.find((item) => item.hijos?.some((h) => h.id === id))?.id ?? null);
     setSidebarAbierto(false);
   };
 
@@ -104,41 +187,102 @@ export default function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
 
       {/* 1. BARRA LATERAL (SIDEBAR RESPONSIVO) */}
       <aside 
-        className={`fixed md:static inset-y-0 left-0 z-50 w-64 bg-[#15733e] text-white flex flex-col justify-between shadow-2xl md:shadow-lg transition-transform duration-300 ease-in-out shrink-0 ${
+        className={`fixed md:static inset-y-0 left-0 z-50 w-64 bg-linear-to-b from-[#1b7a42] to-[#0f5a2d] text-white flex flex-col justify-between shadow-2xl md:shadow-lg transition-transform duration-300 ease-in-out shrink-0 ${
           sidebarAbierto ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
         }`}
       >
         <div className="flex flex-col h-full overflow-hidden">
           
           {/* Logo y Encabezado con botón de cerrar en móvil */}
-          <div className="relative flex flex-col items-center justify-center pt-6 pb-5 border-b border-white/10 shrink-0">
+          <div className="relative flex items-center gap-3 px-5 pt-6 pb-5 shrink-0">
             <button
               onClick={() => setSidebarAbierto(false)}
-              className="absolute top-4 right-4 p-1.5 rounded-lg text-white/70 hover:text-white hover:bg-white/10 md:hidden"
+              className="absolute top-3 right-3 p-1.5 rounded-lg text-white/70 hover:text-white hover:bg-white/10 md:hidden"
             >
               <X className="w-5 h-5" />
             </button>
 
-            <div className="w-14 h-14 md:w-16 md:h-16 rounded-full bg-white flex items-center justify-center p-2 shadow-sm mb-2">
+            <div className="w-14 h-14 rounded-full bg-white flex items-center justify-center p-2 shadow-sm shrink-0">
               <img src={Logo_sena} alt="Logo SENA" className="object-contain w-full h-full" />
             </div>
-            <h1 className="text-xl font-black tracking-wider text-white">AGROSOFT</h1>
-            <span className="text-[10px] tracking-[0.25em] text-white/70 uppercase">Sistema Agrícola</span>
+            <div className="leading-tight">
+              <h1 className="text-lg font-black tracking-wide text-white">AGROSOFT</h1>
+              <span className="text-[10px] tracking-[0.18em] text-white/60 uppercase">Sistema Agrícola</span>
+            </div>
           </div>
 
           {/* Opciones de Navegación con scroll independiente */}
-          <nav className="py-2 flex-1 overflow-y-auto">
+          <nav className="px-3 py-2 flex-1 min-h-0 overflow-y-auto scrollbar-none space-y-0.5">
             {menuItems.map((item) => {
+              const Icon = item.icon;
+
+              if (!item.hijos) {
+                const activo = menuActivo === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => seleccionarOpcion(item.id)}
+                    className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm rounded-xl transition-colors border ${
+                      activo
+                        ? 'bg-[#2a8c52] border-white/15 text-white font-bold shadow-sm'
+                        : 'border-transparent text-white/80 font-medium hover:text-white hover:bg-white/5'
+                    }`}
+                  >
+                    <Icon className="w-5 h-5 shrink-0" />
+                    <span className="flex-1 text-left">{item.label}</span>
+                    {activo && <span className="w-2 h-2 rounded-full bg-[#4ade80]" />}
+                  </button>
+                );
+              }
+
+              const abierto = grupoAbierto === item.id;
+              return (
+                <div key={item.id}>
+                  <button
+                    onClick={() => alternarGrupo(item.id)}
+                    className="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium rounded-xl text-white/80 hover:text-white hover:bg-white/5 transition-colors"
+                  >
+                    <Icon className="w-5 h-5 shrink-0" />
+                    <span className="flex-1 text-left">{item.label}</span>
+                    <ChevronRight className={`w-3.5 h-3.5 text-white/50 transition-transform ${abierto ? 'rotate-90' : ''}`} />
+                  </button>
+                  {abierto && (
+                    <div className="mt-0.5 mb-1 space-y-0.5">
+                      {item.hijos.map((hijo) => {
+                        const activo = menuActivo === hijo.id;
+                        return (
+                          <button
+                            key={hijo.id}
+                            onClick={() => seleccionarOpcion(hijo.id)}
+                            className={`w-full flex items-center gap-3 pl-4.5 pr-4 py-1.5 text-[13px] rounded-lg transition-colors ${
+                              activo
+                                ? 'bg-[#2a8c52] text-white font-bold'
+                                : 'text-white/70 hover:text-white hover:bg-white/5'
+                            }`}
+                          >
+                            <span className={`w-1 h-1 rounded-full shrink-0 ${activo ? 'bg-[#4ade80]' : 'bg-white/40'}`} />
+                            {hijo.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </nav>
+
+          {/* Accesos fijos al pie */}
+          <div className="px-3 py-3 border-t border-white/10 shrink-0 space-y-0.5">
+            {menuPie.map((item) => {
               const Icon = item.icon;
               const activo = menuActivo === item.id;
               return (
                 <button
                   key={item.id}
                   onClick={() => seleccionarOpcion(item.id)}
-                  className={`w-full flex items-center gap-3.5 px-6 py-3 text-sm font-medium transition-colors border-l-4 ${
-                    activo
-                      ? 'bg-[#186438] text-white font-bold border-[#00d664]'
-                      : 'text-[#87bc9b] hover:text-white hover:bg-white/5 border-transparent'
+                  className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm rounded-xl transition-colors ${
+                    activo ? 'bg-[#2a8c52] text-white font-bold' : 'text-white/80 font-medium hover:text-white hover:bg-white/5'
                   }`}
                 >
                   <Icon className="w-5 h-5 shrink-0" />
@@ -146,16 +290,12 @@ export default function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
                 </button>
               );
             })}
-          </nav>
-
-          {/* Opción Cerrar Sesión integrada al pie */}
-          <div className="p-3 border-t border-white/10 shrink-0">
             <button
-              onClick={onLogout}
-              className="w-full flex items-center gap-3.5 px-6 py-3 text-sm font-medium text-[#e06b6b] hover:text-red-300 hover:bg-white/5 transition-colors border-l-4 border-transparent"
+              onClick={() => setConfirmarSalida(true)}
+              className="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-white/80 hover:text-white hover:bg-white/5 rounded-xl transition-colors"
             >
-              <LogOut className="w-5 h-5 shrink-0 rotate-180" />
-              <span>Cerrar sesión</span>
+              <LogOut className="w-5 h-5 shrink-0" />
+              <span>Salir</span>
             </button>
           </div>
 
@@ -204,23 +344,78 @@ export default function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
             </button>
 
             {/* Perfil del Usuario */}
-            <div className="flex items-center gap-2 border-l border-slate-200 pl-3 md:pl-4 cursor-pointer">
-              {usuario?.fotoPerfil ? (
-                <img
-                  src={usuario.fotoPerfil}
-                  alt={`Foto de ${nombreUsuario}`}
-                  className="w-8 h-8 rounded-full object-cover shrink-0"
+            <div className="relative" ref={menuUsuarioRef}>
+              <button
+                type="button"
+                onClick={() => setMenuUsuarioAbierto((abierto) => !abierto)}
+                aria-haspopup="menu"
+                aria-expanded={menuUsuarioAbierto}
+                className="flex items-center gap-2.5 cursor-pointer rounded-lg hover:bg-slate-50 transition px-1.5 py-1"
+              >
+                {usuario?.fotoPerfil ? (
+                  <img
+                    src={usuario.fotoPerfil}
+                    alt={`Foto de ${nombreUsuario}`}
+                    className="w-10 h-10 rounded-full object-cover shrink-0"
+                  />
+                ) : (
+                  <div className="w-10 h-10 rounded-full bg-[#15733e] text-white font-bold flex items-center justify-center text-sm shrink-0">
+                    {inicialesUsuario}
+                  </div>
+                )}
+                <div className="text-left leading-tight hidden sm:block">
+                  <p className="text-sm font-bold text-slate-800">{nombreUsuario}</p>
+                  <p className="text-xs text-slate-400">{rolUsuario}</p>
+                </div>
+                <ChevronDown
+                  className={`w-4 h-4 text-slate-400 transition-transform ${menuUsuarioAbierto ? 'rotate-180' : ''}`}
                 />
-              ) : (
-                <div className="w-8 h-8 rounded-full bg-emerald-700 text-white font-bold flex items-center justify-center text-xs shrink-0">
-                  {inicialesUsuario}
+              </button>
+
+              {menuUsuarioAbierto && (
+                <div
+                  role="menu"
+                  className="absolute right-0 top-full mt-2 w-64 bg-white rounded-xl border border-slate-200 shadow-xl z-50 overflow-hidden"
+                >
+                  <div className="px-4 py-3.5 border-b border-slate-100">
+                    <p className="text-sm font-bold text-slate-900">{nombreUsuario}</p>
+                    <p className="text-xs text-slate-500 mt-0.5 truncate">{usuario?.correo}</p>
+                  </div>
+
+                  <div className="py-1.5">
+                    <button
+                      role="menuitem"
+                      onClick={() => irDesdeMenuUsuario('Perfil')}
+                      className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 transition"
+                    >
+                      <User className="w-4 h-4 text-slate-400" />
+                      Mi perfil
+                    </button>
+                    <button
+                      role="menuitem"
+                      onClick={() => irDesdeMenuUsuario('Configuracion')}
+                      className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 transition"
+                    >
+                      <Settings className="w-4 h-4 text-slate-400" />
+                      Configuración
+                    </button>
+                  </div>
+
+                  <div className="py-1.5 border-t border-slate-100">
+                    <button
+                      role="menuitem"
+                      onClick={() => {
+                        setMenuUsuarioAbierto(false);
+                        setConfirmarSalida(true);
+                      }}
+                      className="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-red-600 hover:bg-red-50 transition"
+                    >
+                      <LogOut className="w-4 h-4" />
+                      Cerrar sesión
+                    </button>
+                  </div>
                 </div>
               )}
-              <div className="text-left leading-tight hidden sm:block">
-                <p className="text-xs font-bold text-slate-800">{nombreUsuario}</p>
-                <p className="text-[10px] text-slate-400">{rolUsuario}</p>
-              </div>
-              <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
             </div>
           </div>
         </header>
@@ -244,6 +439,51 @@ export default function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
 
         </main>
       </div>
+
+      {/* Modal de confirmación para cerrar sesión */}
+      {confirmarSalida && (
+        <div
+          className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm"
+          onClick={() => setConfirmarSalida(false)}
+          onKeyDown={(e) => e.key === 'Escape' && setConfirmarSalida(false)}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="titulo-cerrar-sesion"
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-md bg-white rounded-3xl shadow-2xl px-8 pt-10 pb-8 text-center"
+          >
+            <div className="mx-auto w-18 h-18 rounded-full bg-red-100 flex items-center justify-center">
+              <LogOut className="w-7 h-7 text-red-600" />
+            </div>
+            <h2 id="titulo-cerrar-sesion" className="mt-5 text-xl font-extrabold text-slate-900">
+              ¿Cerrar sesión?
+            </h2>
+            <p className="mt-3 text-sm leading-relaxed text-slate-500">
+              ¿Estás seguro de que deseas cerrar sesión? Tendrás que volver a iniciar sesión para acceder al sistema.
+            </p>
+            <div className="mt-8 grid grid-cols-2 gap-3">
+              <button
+                autoFocus
+                onClick={() => setConfirmarSalida(false)}
+                className="py-3 rounded-xl border border-slate-200 bg-white text-sm font-semibold text-slate-700 hover:bg-slate-50 transition"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => {
+                  setConfirmarSalida(false);
+                  onLogout();
+                }}
+                className="py-3 rounded-xl bg-red-600 text-sm font-bold text-white hover:bg-red-700 transition"
+              >
+                Cerrar sesión
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Botón flotante inferior derecho de ayuda */}
       <button className="fixed bottom-4 right-4 w-9 h-9 rounded-full bg-slate-900 text-white flex items-center justify-center shadow-lg hover:bg-slate-700 transition text-sm z-30">
